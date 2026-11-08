@@ -43,7 +43,7 @@ pub fn triangulate<a>(rings: (&a f64[][])) -> u64[] {
         return e.indices;
     }
     mut threshold: i64 = 80;
-    mut i = 0;
+    mut i: u64 = 0;
     while (threshold >= 0) && (i < rings.len()) {
         threshold = threshold - i64(rings[i].len() / 2);
         i += 1;
@@ -120,7 +120,7 @@ fn linked_list<a, b>(e: (&a mut Earcut), ring: (&b f64[]), clockwise: bool) -> u
     len := ring.len() / 2;
     mut sum = 0.0;
     mut last = NIL;
-    mut j = 0;
+    mut j: u64 = 0;
     if len > 0 {
         j = len - 1;
     }
@@ -485,16 +485,16 @@ fn index_curve<a>(e: (&a mut Earcut), start: u64) {
 // Simon Tatham's linked-list merge sort over the z links.
 fn sort_linked<a>(e: (&a mut Earcut), head: u64) -> u64 {
     mut list = head;
-    mut in_size = 1;
+    mut in_size: u64 = 1;
     loop {
         mut p = list;
         list = NIL;
         mut tail = NIL;
-        mut merges = 0;
+        mut merges: u64 = 0;
         while p != NIL {
             merges += 1;
             mut q = p;
-            mut p_size = 0;
+            mut p_size: u64 = 0;
             for k in in_size {
                 p_size += 1;
                 q = e.nz[q];
