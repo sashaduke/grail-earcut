@@ -75,6 +75,16 @@ int main() {
     emit("noisy_circle", {circle(0, 0, 100, 96, 0.3, false)});
     emit("hashed_holes", {circle(0, 0, 100, 120, 0.2, false), circle(-40, 0, 15, 12, 0.2, true),
                           circle(40, 10, 20, 16, 0.2, true), circle(0, -50, 10, 9, 0.1, true)});
+    {   // 24 square holes in two columns: every hole in a column has the same leftmost x, so
+        // the hole sort has ties and must break them exactly as std::sort does.
+        Polygon poly{{{0, 0}, {300, 0}, {300, 1300}, {0, 1300}}};
+        for (int i = 0; i < 12; ++i) {
+            double y = 20 + i * 105.0;
+            poly.push_back({{40, y}, {40, y + 60}, {100, y + 60}, {100, y}});
+            poly.push_back({{180, y + 10}, {180, y + 70}, {240, y + 70}, {240, y + 10}});
+        }
+        emit("many_tied_holes", poly);
+    }
     emit("touching_hole", {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{0, 5}, {4, 3}, {4, 7}}});
     std::printf("    return bad;\n}\n");
     return 0;

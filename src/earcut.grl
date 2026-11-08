@@ -367,17 +367,8 @@ fn eliminate_holes<a, b>(e: (&a mut Earcut), rings: (&b f64[][]), outer_node: u6
             queue.push(get_leftmost(&e, list));
         }
     }
-    // std::sort by x; ties keep an unspecified order upstream, so use a stable insertion sort,
-    // which agrees with libstdc++'s introsort below its 16-element insertion-sort threshold.
-    for k in queue.len() {
-        mut j = k;
-        while (j > 0) && (e.x[queue[j]] < e.x[queue[j - 1]]) {
-            t := queue[j];
-            queue[j] = queue[j - 1];
-            queue[j - 1] = t;
-            j -= 1;
-        }
-    }
+    // std::sort by x (libstdc++ introsort, reproduced so ties order as upstream)
+    std_sort_x(&e, &mut queue);
     for k in queue.len() {
         outer = eliminate_hole(&mut e, queue[k], outer);
     }
@@ -751,4 +742,183 @@ fn remove_node<a>(e: (&a mut Earcut), p: u64) {
     if nz != NIL {
         e.pz[nz] = pz;
     }
+}
+
+// ---- libstdc++ std::sort over hole indices by x (compareX) ----
+fn x_less<a>(e: (&a Earcut), i: u64, j: u64) -> bool {
+    return e.x[i] < e.x[j];
+}
+fn std_sort_x<a, b>(e: (&a Earcut), v: (&b mut u64[])) {
+    n := v.len();
+    if n < 2 {
+        return ();
+    }
+    mut lg: u64 = 0;
+    mut m = n;
+    while m > 1 {
+        m = m / 2;
+        lg += 1;
+    }
+    sx_introsort(&e, &mut v, 0, n, lg * 2);
+    if n > 16 {
+        sx_insertion(&e, &mut v, 0, 16);
+        mut i: u64 = 16;
+        while i < n {
+            sx_linear_insert(&e, &mut v, i);
+            i += 1;
+        }
+    } else {
+        sx_insertion(&e, &mut v, 0, n);
+    }
+}
+struct Mid3 {
+    a: u64,
+    b: u64,
+    c: u64
+}
+fn sx_swap<b>(v: (&b mut u64[]), i: u64, j: u64) {
+    t := v[i];
+    v[i] = v[j];
+    v[j] = t;
+}
+fn sx_introsort<a, b>(e: (&a Earcut), v: (&b mut u64[]), first: u64, last_in: u64, depth_in: u64) {
+    mut last = last_in;
+    mut depth = depth_in;
+    while last - first > 16 {
+        if depth == 0 {
+            sx_heap_sort(&e, &mut v, first, last);
+            return ();
+        }
+        depth -= 1;
+        mid := first + (last - first) / 2;
+        sx_median(&e, &mut v, first, Mid3 { a: first + 1, b: mid, c: last - 1 });
+        cut := sx_partition(&e, &mut v, first + 1, last, first);
+        sx_introsort(&e, &mut v, cut, last, depth);
+        last = cut;
+    }
+}
+fn sx_median<a, b>(e: (&a Earcut), v: (&b mut u64[]), r: u64, t: Mid3) {
+    if x_less(&e, v[t.a], v[t.b]) {
+        if x_less(&e, v[t.b], v[t.c]) {
+            sx_swap(&mut v, r, t.b);
+        } else {
+            if x_less(&e, v[t.a], v[t.c]) {
+                sx_swap(&mut v, r, t.c);
+            } else {
+                sx_swap(&mut v, r, t.a);
+            }
+        }
+    } else {
+        if x_less(&e, v[t.a], v[t.c]) {
+            sx_swap(&mut v, r, t.a);
+        } else {
+            if x_less(&e, v[t.b], v[t.c]) {
+                sx_swap(&mut v, r, t.c);
+            } else {
+                sx_swap(&mut v, r, t.b);
+            }
+        }
+    }
+}
+fn sx_partition<a, b>(e: (&a Earcut), v: (&b mut u64[]), first_in: u64, last_in: u64, pivot: u64) -> u64 {
+    mut first = first_in;
+    mut last = last_in;
+    loop {
+        while x_less(&e, v[first], v[pivot]) {
+            first += 1;
+        }
+        last -= 1;
+        while x_less(&e, v[pivot], v[last]) {
+            last -= 1;
+        }
+        if (first < last) == false {
+            return first;
+        }
+        sx_swap(&mut v, first, last);
+        first += 1;
+    }
+}
+fn sx_insertion<a, b>(e: (&a Earcut), v: (&b mut u64[]), first: u64, last: u64) {
+    if first == last {
+        return ();
+    }
+    mut i = first + 1;
+    while i < last {
+        if x_less(&e, v[i], v[first]) {
+            val := v[i];
+            mut k = i;
+            while k > first {
+                v[k] = v[k - 1];
+                k -= 1;
+            }
+            v[first] = val;
+        } else {
+            sx_linear_insert(&e, &mut v, i);
+        }
+        i += 1;
+    }
+}
+fn sx_linear_insert<a, b>(e: (&a Earcut), v: (&b mut u64[]), last_in: u64) {
+    mut last = last_in;
+    val := v[last];
+    mut next = last - 1;
+    while x_less(&e, val, v[next]) {
+        v[last] = v[next];
+        last = next;
+        next -= 1;
+    }
+    v[last] = val;
+}
+fn sx_heap_sort<a, b>(e: (&a Earcut), v: (&b mut u64[]), first: u64, last_in: u64) {
+    len := last_in - first;
+    if len >= 2 {
+        mut parent = (len - 2) / 2;
+        loop {
+            val := v[first + parent];
+            sx_adjust(&e, &mut v, first, Mid3 { a: parent, b: len, c: val });
+            if parent == 0 {
+                break;
+            }
+            parent -= 1;
+        }
+    }
+    mut last = last_in;
+    while last - first > 1 {
+        last -= 1;
+        val := v[last];
+        v[last] = v[first];
+        sx_adjust(&e, &mut v, first, Mid3 { a: 0, b: last - first, c: val });
+    }
+}
+fn sx_adjust<a, b>(e: (&a Earcut), v: (&b mut u64[]), first: u64, t: Mid3) {
+    mut hole = t.a;
+    len := t.b;
+    value := t.c;
+    top := hole;
+    mut second = hole;
+    while second < (len - 1) / 2 {
+        second = 2 * (second + 1);
+        if x_less(&e, v[first + second], v[first + second - 1]) {
+            second -= 1;
+        }
+        v[first + hole] = v[first + second];
+        hole = second;
+    }
+    if ((len & 1) == 0) && (second == (len - 2) / 2) {
+        second = 2 * (second + 1);
+        v[first + hole] = v[first + second - 1];
+        hole = second - 1;
+    }
+    mut parent: u64 = 0;
+    if hole > 0 {
+        parent = (hole - 1) / 2;
+    }
+    while (hole > top) && x_less(&e, v[first + parent], value) {
+        v[first + hole] = v[first + parent];
+        hole = parent;
+        if hole > 0 {
+            parent = (hole - 1) / 2;
+        }
+    }
+    v[first + hole] = value;
 }
