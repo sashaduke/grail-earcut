@@ -240,7 +240,7 @@ fn is_ear<a>(e: (&a Earcut), ear: u64) -> bool {
     }
     mut p = e.next[e.next[ear]];
     while p != e.prev[ear] {
-        if point_in_triangle(&e, a, b, c, e.x[p], e.y[p]) && (area(&e, e.prev[p], p, e.next[p]) >= 0.0) {
+        if point_in_triangle(e.x[a], e.y[a], e.x[b], e.y[b], e.x[c], e.y[c], e.x[p], e.y[p]) && (area(&e, e.prev[p], p, e.next[p]) >= 0.0) {
             return false;
         }
         p = e.next[p];
@@ -285,7 +285,7 @@ fn is_ear_hashed<a>(e: (&a Earcut), ear: u64) -> bool {
     mut p = e.nz[ear];
     while (p != NIL) && (e.z[p] <= max_z) {
         if (p != e.prev[ear]) && (p != e.next[ear])
-            && point_in_triangle(&e, a, b, c, e.x[p], e.y[p])
+            && point_in_triangle(e.x[a], e.y[a], e.x[b], e.y[b], e.x[c], e.y[c], e.x[p], e.y[p])
             && (area(&e, e.prev[p], p, e.next[p]) >= 0.0) {
             return false;
         }
@@ -294,7 +294,7 @@ fn is_ear_hashed<a>(e: (&a Earcut), ear: u64) -> bool {
     p = e.pz[ear];
     while (p != NIL) && (e.z[p] >= min_z) {
         if (p != e.prev[ear]) && (p != e.next[ear])
-            && point_in_triangle(&e, a, b, c, e.x[p], e.y[p])
+            && point_in_triangle(e.x[a], e.y[a], e.x[b], e.y[b], e.x[c], e.y[c], e.x[p], e.y[p])
             && (area(&e, e.prev[p], p, e.next[p]) >= 0.0) {
             return false;
         }
@@ -431,8 +431,7 @@ fn find_hole_bridge<a>(e: (&a Earcut), hole: u64, outer: u64) -> u64 {
             ax = hx;
             cx = qx;
         }
-        t := Tri { ax: ax, ay: hy, bx: mx, by: my, cx: cx, cy: hy };
-        if (hx >= px) && (px >= mx) && (hx != px) && tri_contains(&t, px, py) {
+        if (hx >= px) && (px >= mx) && (hx != px) && point_in_triangle(ax, hy, mx, my, cx, hy, px, py) {
             tan_cur := (hy - py).abs() / (hx - px);
             if locally_inside(&e, p, hole)
                 && ((tan_cur < tan_min)
@@ -565,23 +564,11 @@ fn get_leftmost<a>(e: (&a Earcut), start: u64) -> u64 {
     return leftmost;
 }
 
-// Triangle corners for the point-in-triangle test (Grail functions take at most six parameters).
-struct Tri {
-    ax: f64,
-    ay: f64,
-    bx: f64,
-    by: f64,
-    cx: f64,
-    cy: f64
-}
-fn tri_contains<a>(t: (&a Tri), px: f64, py: f64) -> bool {
-    return ((t.cx - px) * (t.ay - py) >= (t.ax - px) * (t.cy - py))
-        && ((t.ax - px) * (t.by - py) >= (t.bx - px) * (t.ay - py))
-        && ((t.bx - px) * (t.cy - py) >= (t.cx - px) * (t.by - py));
-}
-fn point_in_triangle<a>(e: (&a Earcut), a: u64, b: u64, c: u64, px: f64, py: f64) -> bool {
-    t := Tri { ax: e.x[a], ay: e.y[a], bx: e.x[b], by: e.y[b], cx: e.x[c], cy: e.y[c] };
-    return tri_contains(&t, px, py);
+// Whether (px, py) lies inside triangle a-b-c.
+fn point_in_triangle(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64, px: f64, py: f64) -> bool {
+    return ((cx - px) * (ay - py) >= (ax - px) * (cy - py))
+        && ((ax - px) * (by - py) >= (bx - px) * (ay - py))
+        && ((bx - px) * (cy - py) >= (cx - px) * (by - py));
 }
 
 fn is_valid_diagonal<a>(e: (&a Earcut), a: u64, b: u64) -> bool {
